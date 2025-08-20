@@ -1,4 +1,5 @@
 // adjusted from https://github.com/kaivi/node-canvas-text
+// adjusted from https://github.com/kaivi/node-canvas-text
 import { Font } from "opentype.js";
 import { CanvasRenderingContext2D } from "canvas";
 
@@ -51,12 +52,18 @@ interface Rectangle {
   height: number;
 }
 
+interface StrokeOptions {
+  color: string;
+  width: number;
+}
+
 interface Options {
   minSize: number;
   maxSize: number;
   hAlign: string;
   vAlign: string;
   granularity: number;
+  stroke?: StrokeOptions;
 }
 
 export function drawText(
@@ -72,13 +79,22 @@ export function drawText(
 
   ctx.save();
 
+  // Calculate the maximum stroke width that will be used
+  const maxStrokeWidth = options.stroke ? options.stroke.width : 0;
+
+  // Reserve space for stroke
+  const strokeMargin = maxStrokeWidth;
+  const availableWidth = rectangle.width - strokeMargin * 2;
+  const availableHeight = rectangle.height - strokeMargin * 2;
+
   let fontSize = options.maxSize;
   let textMetrics = measureText(text, fontObject, fontSize);
   let textWidth = textMetrics.width;
   let textHeight = textMetrics.height;
 
+  // Size the text to fit within the available space
   while (
-    (textWidth > rectangle.width || textHeight > rectangle.height) &&
+    (textWidth > availableWidth || textHeight > availableHeight) &&
     fontSize >= options.minSize
   ) {
     fontSize = fontSize - options.granularity;
@@ -87,20 +103,21 @@ export function drawText(
     textHeight = textMetrics.height;
   }
 
-  // Calculate text coordinates
-  let xPos = rectangle.x;
+  // Position the text with stroke margin offset
+  let xPos = rectangle.x + strokeMargin;
   let yPos =
     rectangle.y +
     rectangle.height -
-    Math.abs(textMetrics.actualBoundingBoxDescent);
+    Math.abs(textMetrics.actualBoundingBoxDescent) -
+    strokeMargin;
 
   switch (options.hAlign) {
     case "right":
-      xPos = xPos + rectangle.width - textWidth;
+      xPos = xPos + availableWidth - textWidth;
       break;
     case "center":
     case "middle":
-      xPos = xPos + rectangle.width / 2 - textWidth / 2;
+      xPos = xPos + availableWidth / 2 - textWidth / 2;
       break;
     case "left":
       break;
@@ -110,11 +127,11 @@ export function drawText(
 
   switch (options.vAlign) {
     case "top":
-      yPos = yPos - rectangle.height + textHeight;
+      yPos = yPos - rectangle.height + textHeight + strokeMargin * 2;
       break;
     case "center":
     case "middle":
-      yPos = yPos + textHeight / 2 - rectangle.height / 2;
+      yPos = yPos + textHeight / 2 - rectangle.height / 2 + strokeMargin;
       break;
     case "bottom":
     case "baseline":
@@ -123,11 +140,49 @@ export function drawText(
       throw new Error("Invalid options.vAlign parameter: " + options.vAlign);
   }
 
-  // Draw text
-  const fontPath = fontObject.getPath(text, xPos, yPos, fontSize, {});
-  fontPath.fill = ctx.fillStyle as string;
+  if (options.stroke) {
+    // Set stroke properties to prevent extending beyond path
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Draw stroke layers from thickest to thinnest
+    const strokeWidths =
+      options.stroke.width > 4
+        ? [options.stroke.width, options.stroke.width - 2]
+        : [options.stroke.width];
+
+    // Sort stroke widths in descending order (thickest first)
+    strokeWidths.sort((a, b) => b - a);
+
+    for (const strokeWidth of strokeWidths) {
+      // Create a fresh path for each stroke
+      const strokePath = fontObject.getPath(text, xPos, yPos, fontSize, {});
+
+      // Set stroke properties on the path
+      strokePath.fill = null;
+      strokePath.stroke = options.stroke.color;
+      strokePath.strokeWidth = strokeWidth;
+
+      // Apply stroke settings to prevent overextension
+      ctx.save();
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.miterLimit = 1;
+
+      // @ts-expect-error this is quite bad but i hope it will be fine
+      strokePath.draw(ctx);
+
+      ctx.restore();
+    }
+  }
+
+  // Draw the fill on top using the exact same coordinates
+  const fillPath = fontObject.getPath(text, xPos, yPos, fontSize, {});
+  fillPath.fill = ctx.fillStyle as string;
+  fillPath.stroke = null;
+  fillPath.strokeWidth = 0;
   // @ts-expect-error this is quite bad but i hope it will be fine
-  fontPath.draw(ctx);
+  fillPath.draw(ctx);
 
   ctx.restore();
 }

@@ -1,14 +1,14 @@
-import { GuildMember } from "discord.js";
+import {
+  ApplicationCommandOptionType,
+  ApplicationCommandType,
+  GuildMember,
+} from "discord.js";
 import { getOrCreateUserById } from "../../store/models/DDUser.js";
 import { createStandardEmbed } from "../../util/embeds.js";
 import { xpForLevel } from "./xpForMessage.util.js";
 import { createImage, font, getCanvasContext } from "../../util/imageUtils.js";
 import { branding } from "../../util/branding.js";
 import { drawText } from "../../util/textRendering.js";
-import {
-  ApplicationCommandOptionType,
-  ApplicationCommandType,
-} from "discord.js";
 import { formatDayCount, getActualDailyStreak } from "./dailyReward.command.js";
 import { wrapInTransaction } from "../../sentry.js";
 import { format } from "../core/info.command.js";
@@ -44,7 +44,11 @@ export const XpCommand: Command<ApplicationCommandType.ChatInput> = {
     }
     const ddUser = await getOrCreateUserById(BigInt(targetUser.id));
     const xp = ddUser.xp;
-    const image = createXpImage(xp, member);
+    const xpToLevelUp = xpForLevel(ddUser.level + 1);
+    const image = createXpImage(xp, xpToLevelUp, member);
+
+    const formattedXp = format(xp);
+    const formattedNextLevelXp = format(xpToLevelUp);
     const embedBuilder = createStandardEmbed(member)
       .setTitle(`Profile of ${fakeMention(targetUser)}`)
       .setFields(
@@ -69,12 +73,12 @@ export const XpCommand: Command<ApplicationCommandType.ChatInput> = {
         },
         {
           name: "📈 XP Difference (Current Level / Next Level)",
-          value: `${format(ddUser.xp)}/${format(xpForLevel(ddUser.level + 1))}`,
+          value: `${formattedXp}/${formattedNextLevelXp}`,
           inline: true,
         },
         {
           name: "⬆️ XP Needed Until Level Up",
-          value: `${format(xpForLevel(ddUser.level + 1) - ddUser.xp)}`,
+          value: `${format(xpToLevelUp - ddUser.xp)}`,
           inline: true,
         },
         {
@@ -101,10 +105,15 @@ export const XpCommand: Command<ApplicationCommandType.ChatInput> = {
 
 const xpBackground = createImage(1000, 500, "#171834");
 
-function createXpImage(xp: bigint, user: GuildMember) {
+function createXpImage(xp: bigint, xpTotal: bigint, user: GuildMember) {
+  const progress = Number(xp) / Number(xpTotal);
+
   const [canvas, ctx] = getCanvasContext(1000, 500);
   ctx.drawImage(xpBackground, 0, 0);
 
+  // Draw the progress bar on the canvas
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width * progress, canvas.height);
   ctx.fillStyle = user.roles?.color?.hexColor ?? branding.color;
 
   const message = `${xp.toLocaleString()} XP`;
@@ -124,7 +133,12 @@ function createXpImage(xp: bigint, user: GuildMember) {
       maxSize: 450,
       minSize: 1,
       granularity: 3,
+      stroke: {
+        color: "#000000",
+        width: 10,
+      },
     },
   );
+
   return canvas;
 }
