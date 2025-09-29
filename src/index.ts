@@ -10,6 +10,7 @@ import { logger } from "./logging.js";
 import AskToAskModule from "./modules/askToAsk.module.js";
 import { CoreModule } from "./modules/core/core.module.js";
 import FaqModule from "./modules/faq/faq.module.js";
+import { GamesModule } from "./modules/games/games.module.js";
 import { HotTakesModule } from "./modules/hotTakes/hotTakes.module.js";
 import ImageForwarderModule from "./modules/imageForwarder.module.js";
 import { InformationModule } from "./modules/information/information.module.js";
@@ -65,6 +66,7 @@ export const moduleManager = new ModuleManager(
 		ModerationModule,
 		StarboardModule,
 		ModmailModule,
+		GamesModule,
 	],
 );
 
