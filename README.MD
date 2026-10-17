@@ -65,89 +65,19 @@ PostgreSQL database.
 
 ## BlockCount Discord Activity
 
-BlockCount is a single-player 8×8 puzzle inside Discord, with mouse, touch, and
-keyboard controls. Draw a side-connected region containing exactly one clue,
-using as many cells as its number. Cover the board without overlaps to win.
-Generated puzzles always have a solution; other valid solutions are accepted.
-While drawing, a valid selection immediately takes on its clue's block color
-once the cell count matches. Adding too many cells or another clue returns the
-selection to its amber preview; release or press Enter to place a valid block.
-Fast drags include the cells crossed between pointer updates. Moving outside the
-board cancels the current stroke.
-
-Tap a placed block to remove it. Undo restores the previous move, including
-removals and resets. For keyboard play, use arrow keys to move, Space to select,
-Enter to place, Delete/Backspace to remove, and Escape to cancel. Progress is
-saved in this browser/device, not synchronized between devices.
-Completing a puzzle focuses “Play another puzzle” and disables the covered board,
-so keyboard input cannot accidentally change the saved solution.
-Help, Undo, Reset, and New are grouped in the compact header above the board.
-The interface has no preview-mode badge. Discord connection errors close any open
-help or confirmation dialog so the error message remains visible.
-
-The frontend uses the Discord Embedded App SDK. Its HTTP server starts and stops
-inside the bot process, so normal development needs only one command:
-
-```sh
-bun run watch-dev
-```
-
-The bot builds the Activity assets on each non-production startup and serves
-them at `http://localhost:3001`. It supplies its logged-in application ID;
-`DISCORD_CLIENT_ID` is not needed when running with the bot. Configure the
-development bot token and test-server IDs as usual in the local environment and
-`src/Config.ts`.
-
-`ACTIVITY_PORT` is optional and defaults to `3001`. The server exposes only
-`/`, `/app.js`, `/style.css`, `/config.json`, and `/health`. Production uses
-prebuilt assets: the Docker image builds them during image creation. Outside
-Docker, run `bun run activity:build` before `bun run start:prod`.
-
-Compose publishes the Activity port on the bot service; no separate Activity
-container or profile is required:
-
-```sh
-docker compose up --build
-```
-
-For an optional **Activity-only browser preview**, without a bot token or
-database:
-
-```sh
-bun run activity:build
-bun run activity:start
-```
-
-That standalone mode reads `DISCORD_CLIENT_ID` if you want to embed it in
-Discord. Normal browser preview does not connect to Discord.
-
-For local testing inside Discord, expose the Activity port in another terminal:
-
-```sh
-cloudflared tunnel --url http://localhost:3001
-```
-
-Tunnels are not started automatically: they make the local service publicly
-accessible. Put the generated hostname in the development application's URL
-mapping, update it when the tunnel address changes, and remove it after testing.
-
-To enable it in Discord:
-
-1. Open the **existing bot application** in the Discord Developer Portal and
-   enable **Activities**. Enable the desktop/web/mobile platforms you support.
-2. Host this service behind HTTPS. Under **Activities → URL Mappings**, map
-   the `/` prefix to your host (without `https://`; for example,
-   `games.example.com`). Discord does not host the game files for you.
-3. Use the same application as the logged-in bot; its ID is supplied automatically.
-   For Activity-only hosting, set `DISCORD_CLIENT_ID` to that public application ID.
-   Never put the bot token or a client secret in frontend configuration.
-4. Restart the bot to register `/blockcount` in its configured guild. Launch it
-   with that command or the application's **Launch** entry in the App Launcher.
-   Global command synchronization preserves Discord's existing Activity entry.
-
-Verify the embedded launch in Discord after configuring the public host and
-Developer Portal. Browser preview proves gameplay but not Discord's handshake,
-URL mapping, or availability to other users.
+- Enable **Activities** and the supported platforms on the bot's application in
+  the Discord Developer Portal.
+- Expose the Activity server through a public HTTPS host. It listens on port
+  `3001` by default; override with `ACTIVITY_PORT`.
+- Under **Activities → URL Mappings**, map `/` to that hostname without
+  `https://` (for example, `games.example.com`). Local Discord testing requires
+  an HTTPS tunnel to the Activity port.
+- Use the same Discord application as the bot. Its application ID is supplied
+  automatically; standalone hosting requires `DISCORD_CLIENT_ID`.
+- Development startup builds the frontend automatically. For production outside
+  Docker, run `bun run activity:build` before `bun run start:prod`. Docker builds
+  the assets during image creation.
+- Restart the bot to register `/blockcount`, then use it to launch the game.
 
 ## Nix
 
